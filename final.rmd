@@ -1,0 +1,221 @@
+---
+title: "Anti-terrorism"
+author: "Hyunmin Lee"
+date: "May 18, 2018"
+output: 
+  html_document:
+    toc: true
+    theme: united
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(dplyr)
+library(ggplot2)
+library(leaflet)
+library(treemap)
+library(data.table)
+```
+
+
+
+## 1. Introduction
+
+![Stop Terrorism](https://previews.123rf.com/images/toodtuphoto/toodtuphoto1607/toodtuphoto160700045/60654538-illustration-threats-and-global-terrorism.jpg)
+
+News reports about various acts of terror across the world are constant. Despite the frequency of these reports, it is critical that we do not become hardened to them but instead be thinking about what countries should be doing to prevent them.The executive branch has received almost $2.5 trillion for counterterrorism activities and operations since the 9/11 attacks [4].  Furthermore, one important question we should be asking ourselves is where should anti-terrorism efforts be focused. By analyzing datasets, like global terrorism reports, we try to answer this question. 
+
+Although there are many factors which influence the safety of a place or country (like natural disasters, gun violence, etc.), we will focus on terrorism, in particular global terrorism. As defined by the Encyclopaedia Britannica, "terrorism" is the use of violence to create a climate of fear in a population and by doing so bring about  a particular objective. Although an act of terrorism can be committed by an individual for individual purposes, it is most often practiced by groups - political organizations, nationalistic and religious groups, revolutionaries, and more.  
+
+Following the infamous 9-11 terror attack, then-president George W. Bush said that his "war on terror" would "not end until every terrorist group of global reach has been found stopped, and defeated." Seventeen years later the war on terror is far from over. Indeed, it appears to be a never-ending battle. Even though terror may be occurring in other countries it affects everyone as we are connected in many ways - from economy and business, to travel, to shared culture, to families and friends across continents - and all of us are impacted by acts of terror.
+
+![Terrorism is bad](http://www.shkodra.news/wp-content/uploads/2017/09/rusia.jpg)
+
+The severity of the terrorist threat depends on where you are looking though. The dataset we will look at is the global terrorism database found on Kaggle:
+
+https://www.kaggle.com/START-UMD/gtd/data
+
+This dataset contains data about terrorism attacks from 1970 through 2016, which includes information like: date, time, location, number of hostages, number killed, number wounded, the outcome, whether or not it was a suicide, and weapons used.
+
+## 1.1 Dataset
+
+To get started, download the dataset and place it in the same directory as your R markdown file, or set the working directory in R studio to the location where the file was downloaded.
+
+This is how we can load the data from CSV format into an R dataframe:
+
+```{r}
+dat = read.csv("globalterrorismdb_0617dist.csv", header = TRUE)
+```
+
+## 2. Maps of Terrorism
+
+First, we will take a broad look at where terrorism has occurred across the globe. We will use the library leaflet to plot terrorism on top of a map to get a broad sense of where attacks happen. This will provide you a clear visual of not only where terrorist acts are occurring but due to their volume the areas that clearly have a higher occurrence frequency.
+
+```{r  warning=FALSE}
+# build the map with one point per attack
+map <- leaflet(dat) %>%
+  addTiles() %>%
+  addCircles(lng = ~longitude, lat = ~latitude, weight = 1, radius = 1, color = "red")
+
+# plot the map
+map
+```
+
+## 2.1 By country
+
+Now lets look at the terrorism by country using a treemap to see if there are any specific places to avoid. First we will get the total number of attacks per country using the table() function. Then, we use the treemap library to plot it.
+
+```{r}
+# compute the frequency based on country_txt
+freq <- as.data.frame(sort(table(dat$country_txt)))
+
+# plot the treemap
+treemap(freq,
+        index=c("Var1"),
+        vSize = "Freq",
+        type="index",
+        palette = "Reds",
+        title="Terrorism by Country", 
+        fontsize.title = 14          
+)
+```
+
+As we can see here, terrorism is everywhere in the most populated parts of the world. At a glance, the safest place is Antartica. Obviously we can't live there comfortably though.
+
+## 2.2 Attacks by region
+
+Lets also plot by region the number of attacks.
+
+```{r}
+freq <- as.data.frame(sort(table(dat$region_txt)))
+
+treemap(freq,
+         index=c("Var1"),
+         vSize = "Freq",
+         type="index",
+         palette = "Reds",
+         title="Terrorism by Region", 
+         fontsize.title = 14          
+)
+```
+
+So the Middle East and North Africa are hotspots for terrorist activity. Lets look more specifically at the types of attacks going on, so we can figure out what we should be watching out for.
+
+## 2.3 Attack Types
+
+First we use the subset function to extract a subframe.
+
+```{r}
+dat2 <- subset(dat, region_txt == "Middle East & North Africa")
+
+freq <- as.data.frame(sort(table(dat2$attacktype1_txt)))
+
+treemap(freq,
+         index=c("Var1"),
+         vSize = "Freq",
+         type="index",
+         palette = "Reds",
+         title="Attack Type in the Middle East & North Africa", 
+         fontsize.title = 14          
+)
+```
+
+So, we can see that bombings are the most common type of attack by far in the most terrorism prone regions of the world.
+
+## 2.4 Over Time
+
+Lets look at time as a factor. Has terrorism been increasing or decreasing over time? We can use a simple line graph to check this.
+
+```{r}
+ggplot(dat, aes(x=iyear)) + geom_histogram(binwidth = 0.5,aes(fill = ..count..))+
+    ggtitle("Terrorism activity over time")
+```
+
+So terrorism has increase drastically since 1970. Civil wars contribute issues of terrorism and this is part (although not all) of the reason why terrorism is so bad in the greater Middle East. Civil wars compounded with other social issues cause vicious cycles of grievances that motivate groups to often take drastic action.
+
+![NO MORE MISSILES](https://emetonline.org/wp-content/uploads/2015/03/iran20a.jpg)
+
+## 3. Nationality
+
+Now lets look at the nationality of the perpatrators in the terrorist attacks. Maybe certain nationalities are more likely to promote terrorist behaviour.
+
+We show the top 10 for perpetrators nationality based on the number of events.
+
+
+```{r}
+
+dat %>% group_by(natlty1_txt) %>% summarise(nevents = length(natlty1_txt)) %>% top_n(n=10) %>% ungroup() -> dfg
+
+ggplot(data = dfg, aes(x = reorder(natlty1_txt,nevents), y = nevents)) +  
+  geom_bar(stat="identity", fill="blue", colour="black") +
+  coord_flip() + theme_bw(base_size = 8)  +
+   labs(title="", x ="Perpetrators nationality", y = "Terrorist attacks")
+```
+
+So as we can see here, most of the terrorist come out of Iraq, which explains why the president declared a war on terror, targeting Iraq.
+
+## 3.1 Target
+
+Now we can look at the type of target for different attacks.
+
+```{r target_type_1}
+dat %>% filter(targtype1_txt != "") %>% group_by(targtype1_txt) %>% summarise(nt = length(targtype1_txt)) %>% ungroup() -> dft
+
+ggplot(data = dft, aes(x = reorder(targtype1_txt,nt), y = nt)) +  
+  geom_bar(stat="identity", fill="red", colour="black") +
+  coord_flip() + theme_bw(base_size = 8)  +
+   labs(title="", x ="Target type", y = "Number of events")
+```
+
+
+So, it looks like most attacks are going after private citizens and property, which makes sense since they are probably the easiest target. It seems that terrorist organizations attack a country by going after its citizens. This historically makes sense, if we look at attacks such as 9/11.
+
+## 3.2 US Targets
+
+Lets look at US citizens as a target, and see in what contries the most US citizens are killed:
+
+```{r}
+dat %>% filter(nkillus > 0) -> dfk_us
+treemap(dfk_us,
+        index=c("country_txt"),  
+        type = "value",
+        vSize = "nkillus",  
+        vColor="nwoundus",
+        palette = "RdBu",  
+        title="US Citizens killed", 
+        title.legend = "Number killed",
+        fontsize.title = 16
+)
+```
+
+Not surprisingly, most US citizens were killed or wounded in the US, since that is where most US citizens live.
+
+## Conclusion
+
+So, what can we say about terrorism after looking at this dataset? Lets first look at the US. One major thing is that most US citizens are killed in the US itself due to acts of terrorism. The next highest numbers of US citizens is in Afghanistan and Iraq, which is due to the US having soldiers over there, where they are naturally more exposed to terrorist activities. Also by looking at the target, we see that private citizens and property are the prime target. So, in order to defend the US, there should be more emphasis placed on the security at home, since that is the prime target and where most US citizens are killed due to terrorist activities. One surprising thing is that the US itself has a notable number of terrorists. It is much smaller than the top 5, but still surprising.
+
+Looking at the rest of the world, the middle east and south asian take the brunt of it. India in particular, has alot of terrorist activity, which is surprising given the zen-like attitude portrayed on TV and in the media. Iraq and Afghanistan are the top creators and recievers of terrorist activities. This could be due to religeon, but that is mearly speculation and is outside of the scope of this investigation. 
+
+Looking over time, we can see that acts of terrorism are actually a fairly new idea in the scope of recorded human history. This could be due to the fact that the primary tool used for terrorist activites, explosives, have only recently been powerful enough to cause a large amount of damage. The amount of terrorism is, unfortunately, increaseing over time, and has grown very quickly over the past few years. Strangely, it seemed to incease rather drastically specifically after 2010. 
+
+What can we do about all of this going forward? It's hard to say for sure what the best course of action is. One thing that is sure to help however, is increasing awareness to the facts surrounding the matter. When facts and logic are used, good decisions can be made.
+
+## References and Resources
+
+Data:
+
+[1] Kaggle - Global Terrorism Database- Full Data File 1970-2016, June 2017 Release: https://www.kaggle.com/START-UMD/gtd/data
+
+Images:
+
+[1] Stop terrorism photo: https://www.123rf.com/photo_60654538_stock-vector-illustration-threats-and-global-terrorism.html
+
+[2] Iran terrorism photo: https://emetonline.org/emet-praises-legislation-by-senator-ted-cruz-r-tx-to-designate-irans-islamic-revolutionary-guard-corps-irgc-as-a-recognized-foreign-terrorist-organization/#!prettyPhoto
+
+[3] Putin and Kim photo: http://www.shkodra.news/nis-lufta-e-trete-boterore-rusia-hedh-raketen-e-stermadhe-cfare-po-ndodh-tani-foto/
+
+Others:
+
+[4] CSIS Report: https://www.csis.org/analysis/do-we-need-new-strategy-prevent-terrorist-attacks-united-states
+	
